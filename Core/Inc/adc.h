@@ -42,6 +42,10 @@ void MX_ADC1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+signed long getMotor1Current(void);
+signed long getMotor2Current(void);
+signed long getMotor3Current(void);
+signed long getMotor4Current(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

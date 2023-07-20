@@ -158,20 +158,6 @@ void DMA1_Channel1_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles DMA1 channel 4, channel 5 and DMAMUX1 interrupts.
-  */
-void DMA1_Ch4_5_DMAMUX1_OVR_IRQHandler(void)
-{
-  /* USER CODE BEGIN DMA1_Ch4_5_DMAMUX1_OVR_IRQn 0 */
-
-  /* USER CODE END DMA1_Ch4_5_DMAMUX1_OVR_IRQn 0 */
-
-  /* USER CODE BEGIN DMA1_Ch4_5_DMAMUX1_OVR_IRQn 1 */
-
-  /* USER CODE END DMA1_Ch4_5_DMAMUX1_OVR_IRQn 1 */
-}
-
-/**
   * @brief This function handles TIM14 global interrupt.
   */
 void TIM14_IRQHandler(void)

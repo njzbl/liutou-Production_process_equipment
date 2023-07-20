@@ -173,5 +173,27 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 }
 
 /* USER CODE BEGIN 1 */
+signed long getMotor1Current(void)
+{
+    signed long current = 0;
+    return current;
+}
 
+signed long getMotor2Current(void)
+{
+    signed long current = 0;
+    return current;
+}
+
+signed long getMotor3Current(void)
+{
+    signed long current = 0;
+    return current;
+}
+
+signed long getMotor4Current(void)
+{
+    signed long current = 0;
+    return current;
+}
 /* USER CODE END 1 */

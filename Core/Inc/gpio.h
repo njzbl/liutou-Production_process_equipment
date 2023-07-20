@@ -40,6 +40,22 @@ void MX_GPIO_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+GPIO_PinState getS1Status(void);
+GPIO_PinState getS2Status(void);
+GPIO_PinState getS3Status(void);
+GPIO_PinState getS4Status(void);
+GPIO_PinState getS5Status(void);
+GPIO_PinState getS6Status(void);
+GPIO_PinState getKeyinStatus(void);
+uint8_t getS1S6KeyStatus(void);
+void setCheckOut(uint8_t sta);
+void setStart1Out(uint8_t sta);
+void setStart2Out(uint8_t sta);
+void setStart3Out(uint8_t sta);
+void disenableCS0toCS4(void);
+void setDforRed(uint16_t CSPin, uint8_t pinSta);
+void setDforGreen(uint16_t CSPin, uint8_t pinSta);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

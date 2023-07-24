@@ -92,12 +92,12 @@ uint8_t mCmdferCountUart2 = 0;
 
 
 
-uint16_t crc(uint8_t *s,uint16_t len)  
+uint16_t crc(uint8_t *s,uint16_t len)
 {     uint16_t acc = 0,i;
-      while (len--)                              
-      {     acc = acc ^ (*s++ << 8);                
-            for (i = 0; i++ < 8;)                   
-            {     if (acc & 0x8000)                 
+      while (len--)
+      {     acc = acc ^ (*s++ << 8);
+            for (i = 0; i++ < 8;)
+            {     if (acc & 0x8000)
                           acc = (acc << 1) ^ 0x8005;
                   else
                           acc <<= 1;
@@ -173,7 +173,7 @@ uint8_t CMD_Process(void)
     uint8_t status;
     uint8_t cmdType;
     if(mUart1Ready == SET) {
-        //Do something
+        cmd1Len = cmd1Len;//Do something
     }
     if(mUart2Ready == SET) {
         cmd2Len = huart1.RxXferSize - huart1.RxXferCount;
@@ -266,20 +266,24 @@ int main(void)
 
   for (int i = 0; i < ADC_CONVERTED_DATA_BUFFER_SIZE; i++)
   {
-    mADCxConvertedData[i] = VAR_CONVERTED_DATA_INIT_VALUE;  //
+      mADCxConvertedData[i] = VAR_CONVERTED_DATA_INIT_VALUE;  //
   }
-	  if (HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK)//ADC
+  if (HAL_ADCEx_Calibration_Start(&hadc1) != HAL_OK)//ADC
   {
-    /* Calibration Error */
-    while(1);
+      /* Calibration Error */
+      while(1);
   }
-	  if (HAL_ADC_Start_DMA(&hadc1,
-                        (uint32_t *)mADCxConvertedData,
-                        ADC_CONVERTED_DATA_BUFFER_SIZE
-                       ) != HAL_OK)
+  if (HAL_ADC_Start_DMA(&hadc1,
+                      (uint32_t *)mADCxConvertedData,
+                      ADC_CONVERTED_DATA_BUFFER_SIZE
+                      ) != HAL_OK)
   {
-    /* ADC conversion start error */
-    while(1);
+      /* ADC conversion start error */
+      while(1);
+  }
+  if (HAL_TIM_Base_Start_IT(&htim14) != HAL_OK)//start TIM14
+  {
+      while(1);
   }
 
   /* USER CODE END 2 */

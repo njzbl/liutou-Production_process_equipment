@@ -22,6 +22,17 @@
 
 /* USER CODE BEGIN 0 */
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)//1ms�жϻص�����
+{
+  /* Prevent unused argument(s) compilation warning */
+  if(htim->Instance == TIM14) {
+      
+  }
+
+  /* NOTE : This function should not be modified, when the callback is needed,
+            the HAL_TIM_PeriodElapsedCallback could be implemented in the user file
+   */
+}
 /* USER CODE END 0 */
 
 TIM_HandleTypeDef htim14;

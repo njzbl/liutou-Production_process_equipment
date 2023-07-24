@@ -65,20 +65,23 @@ void SystemClock_Config(void);
 #define VAR_CONVERTED_DATA_INIT_VALUE       0
 
 #define UART1_RXBUF_MAX                     20
-#define UART1_TXBUF_MAX                     40
+#define UART1_TXBUF_MAX                     60
 #define UART2_RXBUF_MAX                     20
-#define UART2_TXBUF_MAX                     40
+#define UART2_TXBUF_MAX                     60
 
 __IO   uint16_t mADCxConvertedData[ADC_CONVERTED_DATA_BUFFER_SIZE]; //
 __IO   uint8_t mDmaTransferStatus = 2;//
+__IO   uint8_t mTimerStatus = 2;//
 
 __IO ITStatus mUart1Ready = RESET;
 __IO ITStatus mUart2Ready = RESET;
+__IO   uint8_t mRx1Num = 0;
+__IO   uint8_t mRx2Num = 0;
 
 uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电压
 uint8_t m573Status[5] = {0};
 
-uint8_t mCheckInStatus = 0;
+uint8_t mCheckInStatus = 3;               //3：开机后，一直没有开启检测流程，等待KEY_IN和uart2 信号  2：开机后，已经等到KEY_IN，马上发送启动命令给PC  1：正在检测中，不响应KEY_IN信号   0：检测完成，等待KEY_IN和uart2 信号
 
 
 uint8_t mRxBufUart1[UART1_RXBUF_MAX] = {0};
@@ -120,7 +123,7 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
         return ERR;
     return OK;
 }
-
+#define   CMD_START_PC                    0x00
 #define   CMD_WRITE_CHK                   0x01
 #define   CMD_WRITE_START1                0x02
 #define   CMD_WRITE_START2                0x03
@@ -136,6 +139,8 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
 #define   CMD_READ_AC_FAN2_CURRENT        0x22
 #define   CMD_READ_AC_FAN3_CURRENT        0x23
 
+#define   CMD_READ_ALL                    0x2f
+
 #define   CMD_WRITE_D0_D7_CS0             0x31
 #define   CMD_WRITE_D0_D7_CS1             0x32
 #define   CMD_WRITE_D0_D7_CS2             0x33
@@ -145,24 +150,29 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
 void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
 {
     uint16_t crcVal = 0;
-    if(size > 5)
-        size = 5;
+    uint32_t times = 0;
+    if(size > UART2_TXBUF_MAX - 5)
+        size = UART2_TXBUF_MAX - 5;
     mTxBufUart2[0] = 0x1b;
     mTxBufUart2[1] = 0x10;
     mTxBufUart2[2] = CMD;
-    mTxBufUart2[3] = 0x00;
-    mTxBufUart2[4] = 0x00;
-    mTxBufUart2[5] = 0x00;
-    mTxBufUart2[6] = 0x00;
-    mTxBufUart2[7] = 0x00;
+    for(int i = 0; i < UART2_TXBUF_MAX - 5;i++)
+        mTxBufUart2[i + 3] = 0x00;
     for(int i = 0; i < size;i++)
         mTxBufUart2[3 + i] = data[i];
     crcVal = crc(mTxBufUart2 + 2, 8);
-    mTxBufUart2[8] = crcVal & 0xff;
-    mTxBufUart2[9] = (crcVal >> 8) & 0xff;
-    if(HAL_UART_Transmit_IT(&huart2, mTxBufUart2, UART2_TXBUF_MAX) != HAL_OK) {
-        mUart2Ready = RESET;
+    mTxBufUart2[UART2_TXBUF_MAX - 2] = crcVal & 0xff;
+    mTxBufUart2[UART2_TXBUF_MAX - 1] = (crcVal >> 8) & 0xff;
+
+    HAL_UART_Transmit(&huart2,(uint8_t*)mTxBufUart2,UART2_TXBUF_MAX,1000);      //查询发送，中断接收
+		while(1){
+        if(__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == SET)
+            break;
+        times++;
+        if(times > 0xA000)
+            break;
     }
+    mUart2Ready = RESET;
     return;
 }
 
@@ -183,6 +193,9 @@ uint8_t CMD_Process(void)
         cmdType = huart1.pRxBuffPtr[3];
         switch (cmdType)
         {
+            case CMD_START_PC:
+                mCheckInStatus = 1;
+                break;
             case CMD_WRITE_CHK:
                 setCheckOut(huart1.pRxBuffPtr[4]);
                 break;
@@ -195,10 +208,13 @@ uint8_t CMD_Process(void)
             case CMD_WRITE_START3:
                 setStart3Out(huart1.pRxBuffPtr[4]);
                 break;
-            
+
             case CMD_READ_S1_S6_KEY:
                 status = getS1S6KeyStatus();
                 StatusUpdata(CMD_READ_S1_S6_KEY,&status,1);
+                break;
+            case CMD_READ_ALL:
+                AllStatusUpdata();
                 break;
             default:
                 break;
@@ -290,11 +306,40 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  GPIO_PinState keyin;
+  GPIO_PinState keyinPrevious;
+  int keyinCount = 0;
+
   while (1)
   {
+      if(mTimerStatus != 1) {   //500us Timer
+          continue;
+      if(mCheckInStatus != 1)
+          //>>>>>>>>     Read keyin status    >>>>>>>>>>>>>>>>>>>>>
+          keyin = getKeyinStatus();
+          if(keyinPrevious == GPIO_PIN_RESET && keyin == GPIO_PIN_RESET) {
+              keyinCount++;
+              if(keyinCount > 200)    //100ms 去抖
+              {   mCheckInStatus = 2;
+                  keyinCount = 0;
+              }
+          }
+          keyinPrevious = keyin;
+          //<<<<<<<<<   Read keyin status     <<<<<<<<<<<<<<<<<<<<
+          // if(mRx2Num!= 0 && __HAL_UART_GET_IT(&huart2,UART_IT_IDLE)!=0)
+          // { 
+          //     HAL_UART_RxCpltCallback(&huart2);
+          //     __HAL_UART_CLEAR_IT(&huart2, UART_CLEAR_IDLEF); //手动置0清空标志位
+          // }
+      }
+
+
+
+      mTimerStatus = 0;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    
   }
   /* USER CODE END 3 */
 }

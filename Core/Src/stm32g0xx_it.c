@@ -61,6 +61,8 @@ extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
 
+extern __IO   uint8_t mRx1Num = 0;
+extern __IO   uint8_t mRx2Num = 0;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -195,7 +197,8 @@ void USART2_IRQHandler(void)
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
-
+  
+  mRx1Num++;
   /* USER CODE END USART2_IRQn 1 */
 }
 

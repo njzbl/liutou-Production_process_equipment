@@ -21,12 +21,12 @@
 #include "tim.h"
 
 /* USER CODE BEGIN 0 */
-
+extern __IO  uint8_t mTimerStatus;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)//1ms�жϻص�����
 {
   /* Prevent unused argument(s) compilation warning */
   if(htim->Instance == TIM14) {
-      
+      mTimerStatus = 1;
   }
 
   /* NOTE : This function should not be modified, when the callback is needed,

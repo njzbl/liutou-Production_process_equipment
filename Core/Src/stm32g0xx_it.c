@@ -193,12 +193,13 @@ void USART1_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
-
+  if((huart2.Instance->ISR & UART_IT_RXNE) != 0) {
+      mRx1Num++;
+  }
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
   
-  mRx1Num++;
   /* USER CODE END USART2_IRQn 1 */
 }
 

@@ -144,6 +144,14 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 
 /* USER CODE BEGIN 1 */
 
+void getMotorCurrent(s32* motorCurrent)
+{
+    motorCurrent[0] = ina219_GetCurrent_uA(INA219_I2C_ADDRESS_CONF_0);
+    motorCurrent[1] = ina219_GetCurrent_uA(INA219_I2C_ADDRESS_CONF_1);
+    motorCurrent[2] = ina219_GetCurrent_uA(INA219_I2C_ADDRESS_CONF_4);
+    motorCurrent[3] = ina219_GetCurrent_uA(INA219_I2C_ADDRESS_CONF_5);
+}
+
 s32 ina219_GetCurrent_uA(uint16_t DevAddress)
 {
     s32 current;

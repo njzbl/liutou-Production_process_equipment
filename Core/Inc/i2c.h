@@ -150,6 +150,8 @@ void MX_I2C1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+void getMotorCurrent(s32* motorCurrent);
+void ina219_configureRegisters(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

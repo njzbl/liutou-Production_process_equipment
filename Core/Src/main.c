@@ -59,6 +59,21 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#define VALID           1
+#define INVALID         0
+#define MACHINA         03
+#define MOTOR1          VALID
+#define MOTOR2          INVALID
+#define MOTOR3          INVALID
+#define MOTOR4          INVALID
+#define FAN1            VALID
+#define FAN2            INVALID
+#define FAN3            INVALID
+
+#define MOTOR_CURRENT_F_MIN     3000
+#define MOTOR_CURRENT_B_MIN    -3000
+#define FAN_CURRENT_MIN         2000
+
 #define OK      1
 #define ERR     0
 #define ADC_CONVERTED_DATA_BUFFER_SIZE      3   //目前3路AC_FAN_ADC
@@ -74,8 +89,8 @@ void SystemClock_Config(void);
 #define OPENING			1
 #define CLOSEING		0
 #define OPRN_CLOSE		2
-#define MaOK			0
-#define MaErr			1
+#define MACHINE_OK		0
+#define MACHINE_NG		1
 
 __IO   uint16_t mADCxConvertedData[ADC_CONVERTED_DATA_BUFFER_SIZE]; //
 __IO   uint8_t mDmaTransferStatus = 2;//
@@ -328,6 +343,14 @@ int main(void)
   s32 avrFanCurrent = 0;
   uint8_t fsm = 6;//0,6:初始化不确定状态，等待检测气感信号，确定运动状态。
   uint8_t  windowsSta = OPRN_CLOSE;
+  uint8_t s1tos6Sta1;
+  uint8_t s1tos6Sta2;
+  uint32_t totalCount = 0;
+  uint8_t systemStaMachine = 0;
+  uint8_t motorSta[4] = {MACHINE_OK};
+  uint8_t fanSta[3] = {MACHINE_OK};
+  uint16_t motorStep[4] = {0};
+  uint16_t fanStep[3] = {0};
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -394,19 +417,24 @@ int main(void)
         if(mTimerStatus != 1) {   //500us Timer
             continue;
         }
+        totalCount++;
         if(mDmaTransferStatus == 1) {
             mFanCurrent[0][fanCurrentCount] = mADCxConvertedData[0]*3300/4096;
             mFanCurrent[1][fanCurrentCount] = mADCxConvertedData[1]*3300/4096;
             mFanCurrent[2][fanCurrentCount] = mADCxConvertedData[2]*3300/4096;
             fanCurrentCount++;
             if(fanCurrentCount >= 40) {
-                
                 for(i = 0;i < 3;i++) {
                     avrFanCurrent = 0;
                     for(j = 0;j < 40; j++) {
                         avrFanCurrent += mFanCurrent[i][j];
                     }
-                     mFanCurrent[i][41] = avrFanCurrent / 40;
+                    mFanCurrent[i][41] = avrFanCurrent / 40;
+                    if(totalCount > 200 && totalCount < 1000) {     //100ms ~ 500ms
+                        if(mFanCurrent[i][40] > FAN_CURRENT_MIN) {
+                            fanStep[i]++;
+                        }
+                    }
                 }
             }
         }
@@ -436,6 +464,11 @@ int main(void)
                     avrMCurrrent += mMotorCurrent[i][j];
                 }
                 mMotorCurrent[i][10] = avrMCurrrent / 10;
+                if(totalCount > 200 && totalCount < 1000) {     //100ms ~ 500ms
+                    if(mMotorCurrent[i][10] > MOTOR_CURRENT_F_MIN || mMotorCurrent[i][10] < MOTOR_CURRENT_B_MIN) {
+                        motorStep[i]++;
+                    }
+                }
             }            
         }
 
@@ -446,7 +479,19 @@ int main(void)
                     keyinCount++;
                     if(keyinCount > 200)    //100ms 去抖
                     {   mCheckInStatus = 1;     //开始检测
+                        totalCount = 0;
                         keyinCount = 0;
+                        systemStaMachine = 1;
+                        s1tos6Sta1 = 0;
+                        s1tos6Sta2 = 0xff;
+                        for(i = 0;i < 4; i++) {
+                            motorSta[i] = 0;
+                            motorStep[i] = 0;
+                        }
+                        for(i = 0;i < 3; i++) {
+                            fanSta[i] = 0;
+                            fanStep[i] = 0;
+                        }
                     }
                 }
                 keyinPrevious = keyin;
@@ -457,10 +502,49 @@ int main(void)
             //       __HAL_UART_CLEAR_IT(&huart2, UART_CLEAR_IDLEF); //手动置0清空标志位
             //   }
         }
-        if(mCheckInStatus)
+        switch (systemStaMachine)
+        {
+            case 1:
+                setCheckOut(1);
+                setStart3Out(1);         //接通直流电机
+                if(totalCount > 1000)    //500ms
+                    systemStaMachine = 2;
+                break;
+            case 2:
+                setCheckOut(0);
+                setStart3Out(0);         //断开直流电机，只要断开一个直接点击，S1.S2就会报警。
+                if(totalCount > 12000)    //6000ms
+                    systemStaMachine = 3;
+                break;
+            default:
+                break;
+        }
+        if(totalCount > 200 && totalCount < 1000) {    //这个周期内S1 和 S2都应该是开路的。
+            s1tos6Sta1 |= (getS1S6KeyStatus() & 0x03); // 检测到一次错误就算错误。
+        }
+        if(totalCount > 1000 && totalCount < 1100) {     //500ms ~ 550ms  :（100ms~500ms） 400ms / 0.5ms / 40 = 20 , 应该有20 次，但是留有余量，可能中间有串口中断等情况
+            if(motorStep[0] < 10 && MOTOR1 == VALID)
+                motorSta[0] = MACHINE_NG;
+            if(motorStep[1] < 10  && MOTOR2 == VALID)
+                motorSta[1] = MACHINE_NG;
+            if(motorStep[2] < 10  && MOTOR3 == VALID)
+                motorSta[2] = MACHINE_NG;
+            if(motorStep[3] < 10  && MOTOR4 == VALID)
+                motorSta[3] = MACHINE_NG;
+            if(fanStep[0] < 10 && FAN1 == VALID)
+                fanSta[0] = MACHINE_NG;
+            if(fanStep[1] < 10 && FAN2 == VALID)
+                fanSta[1] = MACHINE_NG;
+            if(fanStep[2] < 10 && FAN3 == VALID)
+                fanSta[2] = MACHINE_NG;
+        }
+        if(totalCount > 12000) {// 6秒后, 实际是断开气感信号5.5秒后。
+            s1tos6Sta2 &= (getS1S6KeyStatus() & 0x03);  //应该每次都是闭合的。
+        }
 
 
-      mTimerStatus = 0;
+
+        mTimerStatus = 0;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

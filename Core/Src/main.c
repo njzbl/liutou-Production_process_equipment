@@ -103,13 +103,18 @@ __IO   uint8_t mRx2Num = 0;
 
 signed long mMotorCurrent[4][11] = {0};
 int mFanCurrent[3][41] = {0};
+uint8_t mMotorSta[4] = {MACHINE_OK};
+uint8_t mFanSta[3] = {MACHINE_OK};
+uint8_t mS1toS6Sta1 = 0;
+uint8_t mS1toS6Sta2 = 0;
 uint8_t mS1toS6 = 0;
+uint8_t mInputStatus = 0;
 uint8_t mLampStatus[3];
 
 uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电压
 uint8_t m573Status[5] = {0};
 
-uint8_t mCheckInStatus = 3;               //3：开机后，一直没有开启检测流程，等待KEY_IN和uart2 信号  2：开机后，已经等到KEY_IN，马上发送启动命令给PC  1：正在检测中，不响应KEY_IN信号   0：检测完成，等待KEY_IN和uart2 信号
+uint8_t mCheckStatus = 3;               //3：开机后，一直没有开启检测流程，等待KEY_IN和uart2 信号  2：开机后，已经等到KEY_IN，马上发送启动命令给PC  1：正在检测中，不响应KEY_IN信号   0：检测完成，等待KEY_IN和uart2 信号
 
 
 uint8_t mRxBufUart1[UART1_RXBUF_MAX] = {0};
@@ -178,11 +183,11 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
 #define   CMD_WRITE_D0_D7_CS3             0x34
 #define   CMD_WRITE_D0_D7_CS4             0x35
 
-void sendBufUart2(void)
+void sendBufUart2(uint8_t txLen)
 {
-    uint i = 0;
+    uint16_t i = 0;
     for(i = 0; i < 3 ;i++) {
-        if(HAL_UART_Transmit_IT(&huart2,(uint8_t*)mTxBufUart2,UART2_TX_CMD_LEN) != HAL_OK) {
+        if(HAL_UART_Transmit_IT(&huart2,(uint8_t*)mTxBufUart2,txLen) != HAL_OK) {
             HAL_Delay(10);
         }
         else
@@ -195,7 +200,6 @@ void sendBufUart2(void)
 void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
 {
     uint16_t crcVal = 0;
-    uint32_t times = 0;
     if(size > UART2_TX_CMD_LEN - 5)
         size = UART2_TX_CMD_LEN - 5;
     mTxBufUart2[0] = 0x1b;
@@ -208,7 +212,7 @@ void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
     crcVal = crc(mTxBufUart2 + 2, size + 1);
     mTxBufUart2[UART2_TX_CMD_LEN - 2] = crcVal & 0xff;
     mTxBufUart2[UART2_TX_CMD_LEN - 1] = (crcVal >> 8) & 0xff;
-    sendBufUart2();
+    sendBufUart2(UART2_TX_CMD_LEN);
 	// while(1){
     //     if(__HAL_UART_GET_FLAG(&huart2,UART_FLAG_TC) == SET)
     //         break;
@@ -223,35 +227,36 @@ void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
 void AllStatusUpdata(void)
 {
     uint16_t crcVal = 0, i = 0;
-    uint32_t times = 0;
-    if(size > UART2_TXBUF_MAX - 5)
-        size = UART2_TXBUF_MAX - 5;
+    uint8_t *prt;
     mTxBufUart2[0] = 0x1b;
     mTxBufUart2[1] = 0x10;
-    mTxBufUart2[2] = CMD;
+    mTxBufUart2[2] = CMD_READ_ALL;
     for(i = 0; i < 4; i++) {
-        mTxBufUart2[3 + i * 4] = mMotorCurrent[i] & 0xff;
-        mTxBufUart2[4 + i * 4] = (mMotorCurrent[i] >> 8) & 0xff;
-        mTxBufUart2[5 + i * 4] = (mMotorCurrent[i] >> 16) & 0xff;
-        mTxBufUart2[6 + i * 4] = (mMotorCurrent[i] >> 24) & 0xff;
+        prt = (uint8_t *)mMotorCurrent[i];
+        mTxBufUart2[3 + i * 4] = prt[0] & 0xff;
+        mTxBufUart2[4 + i * 4] = prt[1] & 0xff;
+        mTxBufUart2[5 + i * 4] = prt[2] & 0xff;
+        mTxBufUart2[6 + i * 4] = prt[3] & 0xff;
     }
  
     for(i = 0; i < 3; i++) {
-        mTxBufUart2[23 + i * 4] = mFanCurrent[i] & 0xff;
-        mTxBufUart2[24 + i * 4] = (mFanCurrent[i] >> 8) & 0xff;
-        mTxBufUart2[25 + i * 4] = (mFanCurrent[i] >> 16) & 0xff;
-        mTxBufUart2[26 + i * 4] = (mFanCurrent[i] >> 24) & 0xff;
+        prt = (uint8_t *)mFanCurrent[i];
+        mTxBufUart2[23 + i * 4] = prt[0] & 0xff;
+        mTxBufUart2[24 + i * 4] = prt[1] & 0xff;
+        mTxBufUart2[25 + i * 4] = prt[2] & 0xff;
+        mTxBufUart2[26 + i * 4] = prt[3] & 0xff;
     }
-    mTxBufUart2[27] = mS1toS6;
-    mTxBufUart2[28] = mLampStatus[0];
-    mTxBufUart2[29] = mLampStatus[1];
-    mTxBufUart2[30] = mLampStatus[2];
+    mTxBufUart2[27] = mCheckStatus;
+    mTxBufUart2[28] = mS1toS6Sta1;
+    mTxBufUart2[29] = mS1toS6Sta2;
+    mTxBufUart2[30] = mMotorSta[0] | (mMotorSta[1] << 1) | (mMotorSta[2] << 2) | (mMotorSta[3] << 3)
+                         | (mFanSta[0] << 4) | (mFanSta[1] << 5) | (mFanSta[2] << 6);
     mTxBufUart2[31] = 0;        //预留
 
     crcVal = crc(mTxBufUart2 + 2, 30);
     mTxBufUart2[32] = crcVal & 0xff;
     mTxBufUart2[33] = (crcVal >> 8) & 0xff;
-    sendBufUart2();
+    sendBufUart2(34);
 }
 
 uint8_t CMD_Process(void)
@@ -272,7 +277,7 @@ uint8_t CMD_Process(void)
         switch (cmdType)
         {
             case CMD_START_PC:
-                mCheckInStatus = 1;
+                mCheckStatus = 1;
                 break;
             case CMD_WRITE_CHK:
                 setCheckOut(huart1.pRxBuffPtr[4]);
@@ -324,6 +329,29 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
    */
 }
 
+void set573DataforS1S6(uint8_t bit)
+{
+    if(((mS1toS6Sta1 & bit) == bit) && ((mS1toS6Sta2 & bit) == 0x00)) {
+        m573Status[0] |= bit;
+        m573Status[1] &= ~bit;
+    }
+    else {
+        m573Status[1] |= bit;
+        m573Status[0] &= ~bit;
+    }
+}
+
+void set573DataforMotorFan(uint8_t sta,uint8_t bit)
+{
+    if(sta == MACHINE_OK) {
+        m573Status[2] |= bit;
+        m573Status[3] &= ~bit;
+    }
+    else {
+        m573Status[2] &= ~bit;
+        m573Status[3] |= bit;
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -334,21 +362,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  uint16_t adcMartix[3][40];
-  uint8_t count;
   GPIO_PinState keyin;
   GPIO_PinState keyinPrevious;
   int keyinCount = 0,avrMCurrrent = 0;;
   uint8_t inaAddress = 0,motorCurrentCount = 0,fanCurrentCount = 0, i,j;
   s32 avrFanCurrent = 0;
-  uint8_t fsm = 6;//0,6:初始化不确定状态，等待检测气感信号，确定运动状态。
-  uint8_t  windowsSta = OPRN_CLOSE;
-  uint8_t s1tos6Sta1;
-  uint8_t s1tos6Sta2;
   uint32_t totalCount = 0;
   uint8_t systemStaMachine = 0;
-  uint8_t motorSta[4] = {MACHINE_OK};
-  uint8_t fanSta[3] = {MACHINE_OK};
   uint16_t motorStep[4] = {0};
   uint16_t fanStep[3] = {0};
   /* USER CODE END 1 */
@@ -429,7 +449,7 @@ int main(void)
                     for(j = 0;j < 40; j++) {
                         avrFanCurrent += mFanCurrent[i][j];
                     }
-                    mFanCurrent[i][41] = avrFanCurrent / 40;
+                    mFanCurrent[i][40] = avrFanCurrent / 40;
                     if(totalCount > 200 && totalCount < 1000) {     //100ms ~ 500ms
                         if(mFanCurrent[i][40] > FAN_CURRENT_MIN) {
                             fanStep[i]++;
@@ -456,7 +476,7 @@ int main(void)
                 inaAddress = 0;
                 motorCurrentCount++;
         }
-        if(motorCurrentCount > = 10) {
+        if(motorCurrentCount >= 10) {
             motorCurrentCount = 0;
             for(i = 0;i < 4;i++) {
                 avrMCurrrent = 0;
@@ -472,27 +492,34 @@ int main(void)
             }            
         }
 
-        if(mCheckInStatus != 1){
+        if(mCheckStatus != 1){
                 //>>>>>>>>     Read keyin status    >>>>>>>>>>>>>>>>>>>>>
                 keyin = getKeyinStatus();
                 if(keyinPrevious == GPIO_PIN_RESET && keyin == GPIO_PIN_RESET) {
                     keyinCount++;
                     if(keyinCount > 200)    //100ms 去抖
-                    {   mCheckInStatus = 1;     //开始检测
+                    {   mCheckStatus = 1;     //开始检测
                         totalCount = 0;
                         keyinCount = 0;
                         systemStaMachine = 1;
-                        s1tos6Sta1 = 0;
-                        s1tos6Sta2 = 0xff;
+                        mS1toS6Sta1 = 0xff;
+                        mS1toS6Sta2 = 0x00;
+                        mInputStatus = 0x00;
                         for(i = 0;i < 4; i++) {
-                            motorSta[i] = 0;
+                            mMotorSta[i] = 0;
                             motorStep[i] = 0;
                         }
                         for(i = 0;i < 3; i++) {
-                            fanSta[i] = 0;
+                            mFanSta[i] = 0;
                             fanStep[i] = 0;
                         }
+                        for(i = 0;i < 4; i++) {
+                            m573Status[i] = 0;
+                        }
                     }
+                }
+                else {
+                    keyinCount = 0;
                 }
                 keyinPrevious = keyin;
             //<<<<<<<<<   Read keyin status     <<<<<<<<<<<<<<<<<<<<
@@ -507,43 +534,82 @@ int main(void)
             case 1:
                 setCheckOut(1);
                 setStart3Out(1);         //接通直流电机
-                if(totalCount > 1000)    //500ms
-                    systemStaMachine = 2;
+                systemStaMachine = 2;
                 break;
             case 2:
+                if(totalCount > 1000)    //500ms
+                    systemStaMachine = 3;
+                break;
+            case 3:
                 setCheckOut(0);
                 setStart3Out(0);         //断开直流电机，只要断开一个直接点击，S1.S2就会报警。
-                if(totalCount > 12000)    //6000ms
-                    systemStaMachine = 3;
+                systemStaMachine = 4;
+                break;
+            case 4:
+                if(totalCount > 12000) {   //6000ms
+                    systemStaMachine = 5;
+                    mCheckStatus = 0; //检测完成，可以进行下一次循环检测    
+                }
                 break;
             default:
                 break;
         }
-        if(totalCount > 200 && totalCount < 1000) {    //这个周期内S1 和 S2都应该是开路的。
-            s1tos6Sta1 |= (getS1S6KeyStatus() & 0x03); // 检测到一次错误就算错误。
+        if(totalCount > 200 && totalCount < 1000) {    //这个周期内S1 和 S2都应该是开路的。开路都是高电平
+            mS1toS6Sta1 &= (getS1S6KeyStatus() & 0xff); // 检测到一次错误就算错误。
         }
         if(totalCount > 1000 && totalCount < 1100) {     //500ms ~ 550ms  :（100ms~500ms） 400ms / 0.5ms / 40 = 20 , 应该有20 次，但是留有余量，可能中间有串口中断等情况
             if(motorStep[0] < 10 && MOTOR1 == VALID)
-                motorSta[0] = MACHINE_NG;
+                mMotorSta[0] = MACHINE_NG;
             if(motorStep[1] < 10  && MOTOR2 == VALID)
-                motorSta[1] = MACHINE_NG;
+                mMotorSta[1] = MACHINE_NG;
             if(motorStep[2] < 10  && MOTOR3 == VALID)
-                motorSta[2] = MACHINE_NG;
+                mMotorSta[2] = MACHINE_NG;
             if(motorStep[3] < 10  && MOTOR4 == VALID)
-                motorSta[3] = MACHINE_NG;
+                mMotorSta[3] = MACHINE_NG;
             if(fanStep[0] < 10 && FAN1 == VALID)
-                fanSta[0] = MACHINE_NG;
+                mFanSta[0] = MACHINE_NG;
             if(fanStep[1] < 10 && FAN2 == VALID)
-                fanSta[1] = MACHINE_NG;
+                mFanSta[1] = MACHINE_NG;
             if(fanStep[2] < 10 && FAN3 == VALID)
-                fanSta[2] = MACHINE_NG;
+                mFanSta[2] = MACHINE_NG;
         }
-        if(totalCount > 12000) {// 6秒后, 实际是断开气感信号5.5秒后。
-            s1tos6Sta2 &= (getS1S6KeyStatus() & 0x03);  //应该每次都是闭合的。
+        if(totalCount > 1100 && totalCount < 11900) {
+            if(motorStep[0] == 0 && motorStep[1] == 0 && motorStep[2] == 0 && motorStep[3] == 0
+                && fanStep[0] == 0 && fanStep[1] == 0 && fanStep[2] == 0) {
+                    mInputStatus |= 0x01;
+                    mInputStatus &= 0xfd;
+                }
+            else {
+                mInputStatus &= 0xfe;
+                mInputStatus |= 0x02;
+            }
         }
-
-
-
+        if(totalCount > 11900) {// 6秒后, 实际是断开气感信号5.5秒后。
+            mS1toS6Sta2 |= (getS1S6KeyStatus() & 0xff);  //应该每次都是闭合的。闭路都是低电平
+        }
+        if(totalCount > 12000) {
+            set573DataforS1S6(0x01);
+            set573DataforS1S6(0x02);
+            set573DataforS1S6(0x04);
+            set573DataforS1S6(0x08);
+            set573DataforS1S6(0x10);
+            set573DataforS1S6(0x20);
+            set573DataforMotorFan(mFanSta[0],0x01);
+            set573DataforMotorFan(mFanSta[1],0x02);
+            set573DataforMotorFan(mFanSta[2],0x04);
+            set573DataforMotorFan(mMotorSta[0],0x08);
+            set573DataforMotorFan(mMotorSta[1],0x10);
+            set573DataforMotorFan(mMotorSta[2],0x20);
+            set573DataforMotorFan(mMotorSta[3],0x40);    
+        }
+        
+        if(totalCount < 10 || totalCount > 12000){
+            setDforGreen(CS0_Pin, m573Status[0]);
+            setDforRed(CS1_Pin, m573Status[1]);
+            setDforGreen(CS2_Pin, m573Status[2]);
+            setDforRed(CS3_Pin, m573Status[3]);
+            setDforRed(CS4_Pin, m573Status[4]);
+        }
         mTimerStatus = 0;
     /* USER CODE END WHILE */
 

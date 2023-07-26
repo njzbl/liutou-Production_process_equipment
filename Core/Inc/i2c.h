@@ -152,6 +152,7 @@ void MX_I2C1_Init(void);
 
 void getMotorCurrent(s32* motorCurrent);
 void ina219_configureRegisters(void);
+s32 ina219_GetCurrent_uA(uint16_t DevAddress);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

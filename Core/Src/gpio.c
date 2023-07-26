@@ -278,12 +278,12 @@ void setDforRed(uint16_t CSPin, uint8_t pinSta)
         HAL_GPIO_WritePin(GPIOA, GPIOA_Pin2Reset, GPIO_PIN_RESET);
     if(CSPin == CS0_Pin || CSPin == CS1_Pin || CSPin == CS2_Pin || CSPin == CS3_Pin){
         HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_SET);
-        HAL_Delay(10); 
+        // HAL_Delay(10); 
         HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_RESET);
     }
     else if(CSPin == CS4_Pin){
         HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_SET);
-        HAL_Delay(10); 
+        // HAL_Delay(10); 
         HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_RESET);
     }
 }
@@ -337,12 +337,12 @@ void setDforGreen(uint16_t CSPin, uint8_t pinSta)   //CS1
         HAL_GPIO_WritePin(GPIOA, GPIOA_Pin2Reset, GPIO_PIN_RESET);    
     if(CSPin == CS0_Pin || CSPin == CS1_Pin || CSPin == CS2_Pin || CSPin == CS3_Pin){
         HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_SET);
-        HAL_Delay(10); 
+        // HAL_Delay(10); 
         HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_RESET);
     }
     else if(CSPin == CS4_Pin){
         HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_SET);
-        HAL_Delay(10); 
+        // HAL_Delay(10); 
         HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_RESET);
     }
 }

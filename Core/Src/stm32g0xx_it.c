@@ -61,8 +61,8 @@ extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
 
-extern __IO   uint8_t mRx1Num = 0;
-extern __IO   uint8_t mRx2Num = 0;
+extern __IO   uint8_t mRx1Num;
+extern __IO   uint8_t mRx2Num;
 /* USER CODE END EV */
 
 /******************************************************************************/

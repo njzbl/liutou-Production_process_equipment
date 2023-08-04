@@ -107,7 +107,7 @@ uint8_t mMotorSta[4] = {MACHINE_OK};
 uint8_t mFanSta[3] = {MACHINE_OK};
 uint8_t mS1toS6Sta1 = 0;
 uint8_t mS1toS6Sta2 = 0;
-uint8_t mS1toS6 = 0;
+uint8_t mS1toS6Sta = 0;
 uint8_t mInputStatus = 0;
 uint8_t mLampStatus[3];
 
@@ -247,10 +247,10 @@ void AllStatusUpdata(void)
         mTxBufUart2[26 + i * 4] = prt[3] & 0xff;
     }
     mTxBufUart2[27] = mCheckStatus;
-    mTxBufUart2[28] = mS1toS6Sta1;
-    mTxBufUart2[29] = mS1toS6Sta2;
-    mTxBufUart2[30] = mMotorSta[0] | (mMotorSta[1] << 1) | (mMotorSta[2] << 2) | (mMotorSta[3] << 3)
+    mTxBufUart2[28] = mS1toS6Sta;
+    mTxBufUart2[29] = mMotorSta[0] | (mMotorSta[1] << 1) | (mMotorSta[2] << 2) | (mMotorSta[3] << 3)
                          | (mFanSta[0] << 4) | (mFanSta[1] << 5) | (mFanSta[2] << 6);
+    mTxBufUart2[30] = 0;        //预留
     mTxBufUart2[31] = 0;        //预留
 
     crcVal = crc(mTxBufUart2 + 2, 30);
@@ -339,6 +339,7 @@ void set573DataforS1S6(uint8_t bit)
         m573Status[1] |= bit;
         m573Status[0] &= ~bit;
     }
+    mS1toS6Sta = m573Status[1];     //0:OK  1： NG
 }
 
 void set573DataforMotorFan(uint8_t sta,uint8_t bit)
@@ -504,6 +505,7 @@ int main(void)
                         systemStaMachine = 1;
                         mS1toS6Sta1 = 0xff;
                         mS1toS6Sta2 = 0x00;
+                        mS1toS6Sta = 0x00;      //0： OK ，1 ：NG
                         mInputStatus = 0x00;
                         for(i = 0;i < 4; i++) {
                             mMotorSta[i] = 0;

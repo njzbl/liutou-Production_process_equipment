@@ -38,6 +38,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+void sendBufUart1(uint8_t txLen);
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -183,6 +184,20 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
 #define   CMD_WRITE_D0_D7_CS3             0x34
 #define   CMD_WRITE_D0_D7_CS4             0x35
 
+void sendBufUart1(uint8_t txLen)
+{
+    uint16_t i = 0;
+    for(i = 0; i < 3 ;i++) {
+        if(HAL_UART_Transmit_IT(&huart1,(uint8_t*)mTxBufUart1,txLen) != HAL_OK) {
+            HAL_Delay(10);
+        }
+        else
+            break;
+    }
+    if(i >=3)
+        Error_Handler();
+}
+
 void sendBufUart2(uint8_t txLen)
 {
     uint16_t i = 0;
@@ -269,27 +284,27 @@ uint8_t CMD_Process(void)
         cmd1Len = cmd1Len;//Do something
     }
     if(mUart2Ready == SET) {
-        cmd2Len = huart1.RxXferSize - huart1.RxXferCount;
-        re = CMD_Analysis(huart1.pRxBuffPtr,cmd2Len);
+        cmd2Len = huart2.RxXferSize - huart2.RxXferCount;
+        re = CMD_Analysis(huart2.pRxBuffPtr,cmd2Len);
         if(re != OK)
           return re;
-        cmdType = huart1.pRxBuffPtr[3];
+        cmdType = huart2.pRxBuffPtr[3];
         switch (cmdType)
         {
             case CMD_START_PC:
                 mCheckStatus = 1;
                 break;
             case CMD_WRITE_CHK:
-                setCheckOut(huart1.pRxBuffPtr[4]);
+                setCheckOut(huart2.pRxBuffPtr[4]);
                 break;
             case CMD_WRITE_START1:
-                setStart1Out(huart1.pRxBuffPtr[4]);
+                setStart1Out(huart2.pRxBuffPtr[4]);
                 break;
             case CMD_WRITE_START2:
-                setStart2Out(huart1.pRxBuffPtr[4]);
+                setStart2Out(huart2.pRxBuffPtr[4]);
                 break;
             case CMD_WRITE_START3:
-                setStart3Out(huart1.pRxBuffPtr[4]);
+                setStart3Out(huart2.pRxBuffPtr[4]);
                 break;
 
             case CMD_READ_S1_S6_KEY:
@@ -366,7 +381,7 @@ int main(void)
   GPIO_PinState keyin;
   GPIO_PinState keyinPrevious;
   int keyinCount = 0,avrMCurrrent = 0;;
-  uint8_t inaAddress = 0,motorCurrentCount = 0,fanCurrentCount = 0, i,j;
+  uint8_t inaAddress = 0,motorCurrentCount = 0,fanCurrentCount = 0, i = 0,j = 0;
   s32 avrFanCurrent = 0;
   uint32_t totalCount = 0;
   uint8_t systemStaMachine = 0;
@@ -399,8 +414,8 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  for (int i = 0; i < ADC_CONVERTED_DATA_BUFFER_SIZE; i++)
+    
+  for (i = 0; i < ADC_CONVERTED_DATA_BUFFER_SIZE; i++)
   {
       mADCxConvertedData[i] = VAR_CONVERTED_DATA_INIT_VALUE;  //
   }
@@ -426,7 +441,7 @@ int main(void)
   {
         Error_Handler();
   }
-
+  ina219_configureRegisters();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -438,6 +453,7 @@ int main(void)
         if(mTimerStatus != 1) {   //500us Timer
             continue;
         }
+        ToggleWDI();
         totalCount++;
         if(mDmaTransferStatus == 1) {
             mFanCurrent[0][fanCurrentCount] = mADCxConvertedData[0]*3300/4096;
@@ -445,6 +461,7 @@ int main(void)
             mFanCurrent[2][fanCurrentCount] = mADCxConvertedData[2]*3300/4096;
             fanCurrentCount++;
             if(fanCurrentCount >= 40) {
+                fanCurrentCount = 0;
                 for(i = 0;i < 3;i++) {
                     avrFanCurrent = 0;
                     for(j = 0;j < 40; j++) {
@@ -606,11 +623,11 @@ int main(void)
         }
         
         if(totalCount < 10 || totalCount > 12000){
-            setDforGreen(CS0_Pin, m573Status[0]);
-            setDforRed(CS1_Pin, m573Status[1]);
-            setDforGreen(CS2_Pin, m573Status[2]);
-            setDforRed(CS3_Pin, m573Status[3]);
-            setDforRed(CS4_Pin, m573Status[4]);
+            setDforGreen(0, m573Status[0]);
+            setDforRed(1, m573Status[1]);
+            setDforGreen(2, m573Status[2]);
+            setDforRed(3, m573Status[3]);
+            setDforRed(4, m573Status[4]);
         }
         mTimerStatus = 0;
     /* USER CODE END WHILE */
@@ -683,6 +700,8 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    HAL_Delay(100);
+    Toggle_SYSTEM_OK_();
   }
   /* USER CODE END Error_Handler_Debug */
 }

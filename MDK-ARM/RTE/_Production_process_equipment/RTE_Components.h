@@ -4,7 +4,7 @@
  *      *** Do not modify ! ***
  *
  * Project: 'Production process equipment' 
- * Target:  'Production process equipment' 
+ * Target:  'Production_process_equipment' 
  */
 
 #ifndef RTE_COMPONENTS_H

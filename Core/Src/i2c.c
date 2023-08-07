@@ -166,14 +166,14 @@ s32 ina219_GetCurrent_uA(uint16_t DevAddress)
     val[0] = (unsigned char)(regval >> 8);
     val[1] = (unsigned char)(regval & 0xFF);
     HAL_I2C_Mem_Write(&hi2c1, DevAddress, INA219_REG_CALIBRATION,
-                                      I2C_MEMADD_SIZE_16BIT, val, 2, 1000);
-    HAL_Delay(1);   //1ms
+                                      I2C_MEMADD_SIZE_16BIT, val, 2, 0);
+    // HAL_Delay(1);   //1ms
     
     val[0] = 0;
     val[1] = 0;
     // Now we can safely read the CURRENT register!
     HAL_I2C_Mem_Read(&hi2c1, DevAddress, INA219_REG_CURRENT,
-                                I2C_MEMADD_SIZE_16BIT, val, 2, 1000);
+                                I2C_MEMADD_SIZE_16BIT, val, 2, 0);
                                 
     regval = ((unsigned int)(val[0]) << 8) + val[1];
     current = (s32)regval * INA219_CURRENT_LSB_UA;

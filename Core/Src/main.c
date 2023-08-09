@@ -20,14 +20,13 @@
 #include "main.h"
 #include "adc.h"
 #include "dma.h"
-#include "i2c.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "ina219a.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,7 +101,7 @@ __IO ITStatus mUart2Ready = RESET;
 __IO   uint8_t mRx1Num = 0;
 __IO   uint8_t mRx2Num = 0;
 
-signed long mMotorCurrent[4][11] = {0};
+int mMotorCurrent[4][11] = {0};// signed long mMotorCurrent[4][11] = {0};
 int mFanCurrent[3][41] = {0};
 uint8_t mMotorSta[4] = {MACHINE_OK};
 uint8_t mFanSta[3] = {MACHINE_OK};
@@ -112,7 +111,7 @@ uint8_t mS1toS6Sta = 0;
 uint8_t mInputStatus = 0;
 uint8_t mLampStatus[3];
 
-uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电压
+uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电�?
 uint8_t m573Status[5] = {0};
 
 uint8_t mCheckStatus = 3;               //3：开机后，一直没有开启检测流程，等待KEY_IN和uart2 信号  2：开机后，已经等到KEY_IN，马上发送启动命令给PC  1：正在检测中，不响应KEY_IN信号   0：检测完成，等待KEY_IN和uart2 信号
@@ -151,11 +150,13 @@ uint8_t CMD_Analysis(uint8_t* CmdBuf, uint8_t bufSize)
         return ERR;
     if(CmdBuf[0] != 0x1b || CmdBuf[1] != 0x10) {
         HAL_UART_Receive_IT(&huart2, (uint8_t *)mRxBufUart2, UART2_RXBUF_MAX);
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)mRxBufUart1, UART1_RXBUF_MAX);
         return ERR;
     }
     crc16Val = crc(CmdBuf + 2, 8);
     if(crc16Val != 0) {
         HAL_UART_Receive_IT(&huart2, (uint8_t *)mRxBufUart2, UART2_RXBUF_MAX);
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)mRxBufUart1, UART1_RXBUF_MAX);
         return ERR;
     }
     return OK;
@@ -211,7 +212,7 @@ void sendBufUart2(uint8_t txLen)
     if(i >=3)
         Error_Handler();
 }
-//这个函数可以作废了
+//这个函数可以作废�?
 void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
 {
     uint16_t crcVal = 0;
@@ -318,6 +319,7 @@ uint8_t CMD_Process(void)
                 break;
         }
         HAL_UART_Receive_IT(&huart2, (uint8_t *)mRxBufUart2, UART2_RXBUF_MAX);
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)mRxBufUart1, UART1_RXBUF_MAX);
     }
     return re;
 }
@@ -409,7 +411,6 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_ADC1_Init();
-  MX_I2C1_Init();
   MX_TIM14_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
@@ -441,7 +442,12 @@ int main(void)
   {
         Error_Handler();
   }
-  ina219_configureRegisters();
+
+  if(HAL_UART_Receive_IT(&huart1, (uint8_t *)mRxBufUart1, UART1_RXBUF_MAX) != HAL_OK)
+  {
+        Error_Handler();
+  }
+//   ina219_configureRegisters();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -459,6 +465,7 @@ int main(void)
             mFanCurrent[0][fanCurrentCount] = mADCxConvertedData[0]*3300/4096;
             mFanCurrent[1][fanCurrentCount] = mADCxConvertedData[1]*3300/4096;
             mFanCurrent[2][fanCurrentCount] = mADCxConvertedData[2]*3300/4096;
+            mDmaTransferStatus = 0;
             fanCurrentCount++;
             if(fanCurrentCount >= 40) {
                 fanCurrentCount = 0;
@@ -516,13 +523,13 @@ int main(void)
                 if(keyinPrevious == GPIO_PIN_RESET && keyin == GPIO_PIN_RESET) {
                     keyinCount++;
                     if(keyinCount > 200)    //100ms 去抖
-                    {   mCheckStatus = 1;     //开始检测
+                    {   mCheckStatus = 1;     //�?始检�?
                         totalCount = 0;
                         keyinCount = 0;
                         systemStaMachine = 1;
                         mS1toS6Sta1 = 0xff;
                         mS1toS6Sta2 = 0x00;
-                        mS1toS6Sta = 0x00;      //0： OK ，1 ：NG
+                        mS1toS6Sta = 0x00;      //0�? OK �?1 ：NG
                         mInputStatus = 0x00;
                         for(i = 0;i < 4; i++) {
                             mMotorSta[i] = 0;
@@ -701,7 +708,7 @@ void Error_Handler(void)
   while (1)
   {
     HAL_Delay(100);
-    Toggle_SYSTEM_OK_();
+    Toggle_SYSTEM_OK();
   }
   /* USER CODE END Error_Handler_Debug */
 }

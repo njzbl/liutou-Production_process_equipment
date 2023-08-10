@@ -63,17 +63,25 @@ void SystemClock_Config(void);
 #define INVALID         0
 #define MACHINA         03
 #define MOTOR1          VALID
-#define MOTOR2          INVALID
-#define MOTOR3          INVALID
+#define MOTOR2          VALID
+#define MOTOR3          VALID
 #define MOTOR4          INVALID
 #define FAN1            VALID
 #define FAN2            INVALID
 #define FAN3            INVALID
 
+#define DEVS1           VALID
+#define DEVS2           VALID
+#define DEVS3           INVALID
+#define DEVS4           INVALID
+#define DEVS5           INVALID
+#define DEVS6           INVALID
+
 #define MOTOR_CURRENT_F_MIN     3000
 #define MOTOR_CURRENT_B_MIN    -3000
-#define FAN_CURRENT_MIN         2000
+#define FAN_CURRENT_MIN         100
 
+#define QG_SIGN_KEY_DELAY_1000MS       1000
 #define OK      1
 #define ERR     0
 #define ADC_CONVERTED_DATA_BUFFER_SIZE      3   //目前3路AC_FAN_ADC
@@ -111,7 +119,7 @@ uint8_t mS1toS6Sta = 0;
 uint8_t mInputStatus = 0;
 uint8_t mLampStatus[3];
 
-uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电�?
+uint16_t mVolAcFan[ADC_CONVERTED_DATA_BUFFER_SIZE]; // 交流风机实际的采样电�????
 uint8_t m573Status[5] = {0};
 
 uint8_t mCheckStatus = 3;               //3：开机后，一直没有开启检测流程，等待KEY_IN和uart2 信号  2：开机后，已经等到KEY_IN，马上发送启动命令给PC  1：正在检测中，不响应KEY_IN信号   0：检测完成，等待KEY_IN和uart2 信号
@@ -212,7 +220,7 @@ void sendBufUart2(uint8_t txLen)
     if(i >=3)
         Error_Handler();
 }
-//这个函数可以作废�?
+//这个函数可以作废�????
 void StatusUpdata(uint8_t CMD,uint8_t* data,uint8_t size)
 {
     uint16_t crcVal = 0;
@@ -346,17 +354,31 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
    */
 }
 
+// void set573DataforS1S6(uint8_t bit)
+// {
+//     if(((mS1toS6Sta1 & bit) == bit) && ((mS1toS6Sta2 & bit) == 0x00)) {
+//         m573Status[0] |= bit;
+//         m573Status[1] &= ~bit;
+//     }
+//     else {
+//         m573Status[1] |= bit;
+//         m573Status[0] &= ~bit;
+//     }
+//     mS1toS6Sta = m573Status[1];     //0:OK  1�??? NG
+// }
+//mS1toS6Sta1  有一个是低电平就是有故障
+//mS1toS6Sta2  有一个是高电平就是有故障
 void set573DataforS1S6(uint8_t bit)
 {
-    if(((mS1toS6Sta1 & bit) == bit) && ((mS1toS6Sta2 & bit) == 0x00)) {
-        m573Status[0] |= bit;
-        m573Status[1] &= ~bit;
-    }
-    else {
+    if(((mS1toS6Sta1 & bit) != bit) || ((mS1toS6Sta2 & bit) == bit)) {
         m573Status[1] |= bit;
         m573Status[0] &= ~bit;
     }
-    mS1toS6Sta = m573Status[1];     //0:OK  1： NG
+    else {
+        m573Status[0] |= bit;
+        m573Status[1] &= ~bit;
+    }
+    mS1toS6Sta = m573Status[1];     //0:OK  NG:1
 }
 
 void set573DataforMotorFan(uint8_t sta,uint8_t bit)
@@ -382,13 +404,14 @@ int main(void)
   /* USER CODE BEGIN 1 */
   GPIO_PinState keyin;
   GPIO_PinState keyinPrevious;
-  int keyinCount = 0,avrMCurrrent = 0;;
+  int keyinCount = 0,avrMCurrrent = 0;
   uint8_t inaAddress = 0,motorCurrentCount = 0,fanCurrentCount = 0, i = 0,j = 0;
   s32 avrFanCurrent = 0;
   uint32_t totalCount = 0;
   uint8_t systemStaMachine = 0;
   uint16_t motorStep[4] = {0};
   uint16_t fanStep[3] = {0};
+  int motorCur_temp[4] = {0};
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -415,6 +438,10 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
+    for(i = 0 ;i < 5; i++) {
+        setDforLed(i, m573Status[i]);
+    }
     
   for (i = 0; i < ADC_CONVERTED_DATA_BUFFER_SIZE; i++)
   {
@@ -447,7 +474,7 @@ int main(void)
   {
         Error_Handler();
   }
-//   ina219_configureRegisters();
+  ina219_configureRegisters();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -455,12 +482,14 @@ int main(void)
 
   while (1)
   {
-        CMD_Process();
-        if(mTimerStatus != 1) {   //500us Timer
+        // CMD_Process();//
+        if(mTimerStatus != 1) {   //1000us Timer
             continue;
         }
         ToggleWDI();
-        totalCount++;
+        set_SYSTEM_OK();
+        if(mCheckStatus != 3)
+            totalCount++;
         if(mDmaTransferStatus == 1) {
             mFanCurrent[0][fanCurrentCount] = mADCxConvertedData[0]*3300/4096;
             mFanCurrent[1][fanCurrentCount] = mADCxConvertedData[1]*3300/4096;
@@ -475,7 +504,8 @@ int main(void)
                         avrFanCurrent += mFanCurrent[i][j];
                     }
                     mFanCurrent[i][40] = avrFanCurrent / 40;
-                    if(totalCount > 200 && totalCount < 1000) {     //100ms ~ 500ms
+                    // if(totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS) && totalCount < (500 + QG_SIGN_KEY_DELAY_1000MS)) {     //100ms ~ 500ms
+                    if(totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS)) {     //> 100ms
                         if(mFanCurrent[i][40] > FAN_CURRENT_MIN) {
                             fanStep[i]++;
                         }
@@ -496,6 +526,7 @@ int main(void)
         else if(inaAddress == 3){
                 mMotorCurrent[3][motorCurrentCount] = ina219_GetCurrent_uA(INA219_I2C_ADDRESS_CONF_5);
         }
+        motorCur_temp[inaAddress] = mMotorCurrent[inaAddress][motorCurrentCount];
         inaAddress++;
         if(inaAddress >= 4) {
                 inaAddress = 0;
@@ -509,7 +540,8 @@ int main(void)
                     avrMCurrrent += mMotorCurrent[i][j];
                 }
                 mMotorCurrent[i][10] = avrMCurrrent / 10;
-                if(totalCount > 200 && totalCount < 1000) {     //100ms ~ 500ms
+                // if(totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS) && totalCount < (500 + QG_SIGN_KEY_DELAY_1000MS)) {     //100ms ~ 500ms
+                if(totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS)) {     // > 100ms
                     if(mMotorCurrent[i][10] > MOTOR_CURRENT_F_MIN || mMotorCurrent[i][10] < MOTOR_CURRENT_B_MIN) {
                         motorStep[i]++;
                     }
@@ -522,14 +554,14 @@ int main(void)
                 keyin = getKeyinStatus();
                 if(keyinPrevious == GPIO_PIN_RESET && keyin == GPIO_PIN_RESET) {
                     keyinCount++;
-                    if(keyinCount > 200)    //100ms 去抖
-                    {   mCheckStatus = 1;     //�?始检�?
+                    if(keyinCount > 100)    //100ms 去抖
+                    {   mCheckStatus = 1;     //�????始检�????
                         totalCount = 0;
                         keyinCount = 0;
                         systemStaMachine = 1;
                         mS1toS6Sta1 = 0xff;
                         mS1toS6Sta2 = 0x00;
-                        mS1toS6Sta = 0x00;      //0�? OK �?1 ：NG
+                        mS1toS6Sta = 0x00;      //0�???? OK �????1 ：NG
                         mInputStatus = 0x00;
                         for(i = 0;i < 4; i++) {
                             mMotorSta[i] = 0;
@@ -552,38 +584,40 @@ int main(void)
             //   if(mRx2Num!= 0 && __HAL_UART_GET_IT(&huart2,UART_IT_IDLE)!=0)
             //   { 
             //       HAL_UART_RxCpltCallback(&huart2);
-            //       __HAL_UART_CLEAR_IT(&huart2, UART_CLEAR_IDLEF); //手动置0清空标志位
+            //       __HAL_UART_CLEAR_IT(&huart2, UART_CLEAR_IDLEF); //手动�???0清空标志�???
             //   }
         }
         switch (systemStaMachine)
         {
             case 1:
                 setCheckOut(1);
-                setStart3Out(1);         //接通直流电机
+                setStart3Out(1);         //接�?�直流电�???
                 systemStaMachine = 2;
                 break;
             case 2:
-                if(totalCount > 1000)    //500ms
+                if(totalCount > QG_SIGN_KEY_DELAY_1000MS) {    //200ms     //给合本的设备200ms的气感按钮信号
                     systemStaMachine = 3;
+                    // setCheckOut(0);      //应该一直处于开门状态
+                }
                 break;
-            case 3:
-                setCheckOut(0);
-                setStart3Out(0);         //断开直流电机，只要断开一个直接点击，S1.S2就会报警。
+            case 3:                
+                // setStart3Out(0);         //断开直流电机，只要断�???�???个直接点击，S1.S2就会报警�???
                 systemStaMachine = 4;
                 break;
             case 4:
-                if(totalCount > 12000) {   //6000ms
+                if(totalCount > (6000 + QG_SIGN_KEY_DELAY_1000MS)) {   //6000ms
                     systemStaMachine = 5;
-                    mCheckStatus = 0; //检测完成，可以进行下一次循环检测    
+                    mCheckStatus = 0; //�???测完成，可以进行下一次循环检�???    
                 }
                 break;
             default:
                 break;
         }
-        if(totalCount > 200 && totalCount < 1000) {    //这个周期内S1 和 S2都应该是开路的。开路都是高电平
-            mS1toS6Sta1 &= (getS1S6KeyStatus() & 0xff); // 检测到一次错误就算错误。
+        if(totalCount > (1000 + QG_SIGN_KEY_DELAY_1000MS) && totalCount < (2500 + QG_SIGN_KEY_DELAY_1000MS)) {    //这个周期内S1 �??? S2都应该是�???路的。开路都是高电平
+            mS1toS6Sta1 &= (getS1S6KeyStatus() & 0xff); // �???测到�???次错误就算错误�??  //有一个是低电平就是有故障
         }
-        if(totalCount > 1000 && totalCount < 1100) {     //500ms ~ 550ms  :（100ms~500ms） 400ms / 0.5ms / 40 = 20 , 应该有20 次，但是留有余量，可能中间有串口中断等情况
+        // if(totalCount > (500 + QG_SIGN_KEY_DELAY_1000MS) && totalCount < (550 + QG_SIGN_KEY_DELAY_1000MS)) {     //500ms ~ 550ms  :�???100ms~500ms�??? 400ms / 0.5ms / 40 = 20 , 应该�???20 次，但是留有余量，可能中间有串口中断等情�???
+        if(totalCount > 5000) {     //500ms ~ 550ms  :�???100ms~500ms�??? 400ms / 0.5ms / 40 = 20 , 应该�???20 次，但是留有余量，可能中间有串口中断等情�???
             if(motorStep[0] < 10 && MOTOR1 == VALID)
                 mMotorSta[0] = MACHINE_NG;
             if(motorStep[1] < 10  && MOTOR2 == VALID)
@@ -599,7 +633,8 @@ int main(void)
             if(fanStep[2] < 10 && FAN3 == VALID)
                 mFanSta[2] = MACHINE_NG;
         }
-        if(totalCount > 1100 && totalCount < 11900) {
+        // if(totalCount > (550 + QG_SIGN_KEY_DELAY_1000MS) && totalCount < (5950 + QG_SIGN_KEY_DELAY_1000MS)) {     //如果给了气感信号后，什么反应也没有，那么就等于合本的设备气感信号输入端有问题。
+        if(totalCount > 5000) {     //如果给了气感信号后，什么反应也没有，那么就等于合本的设备气感信号输入端有问题。
             if(motorStep[0] == 0 && motorStep[1] == 0 && motorStep[2] == 0 && motorStep[3] == 0
                 && fanStep[0] == 0 && fanStep[1] == 0 && fanStep[2] == 0) {
                     mInputStatus |= 0x01;
@@ -610,33 +645,59 @@ int main(void)
                 mInputStatus |= 0x02;
             }
         }
-        if(totalCount > 11900) {// 6秒后, 实际是断开气感信号5.5秒后。
-            mS1toS6Sta2 |= (getS1S6KeyStatus() & 0xff);  //应该每次都是闭合的。闭路都是低电平
+        if(totalCount > (5950 + QG_SIGN_KEY_DELAY_1000MS)) {// 6秒后, 实际是断�???气感信号5.5秒后�???
+            mS1toS6Sta2 |= (getS1S6KeyStatus() & 0xff);  //应该每次都是闭合的�?�闭路都是低电平，有一个是高电平那就是有故障。
         }
-        if(totalCount > 12000) {
-            set573DataforS1S6(0x01);
-            set573DataforS1S6(0x02);
-            set573DataforS1S6(0x04);
-            set573DataforS1S6(0x08);
-            set573DataforS1S6(0x10);
-            set573DataforS1S6(0x20);
-            set573DataforMotorFan(mFanSta[0],0x01);
-            set573DataforMotorFan(mFanSta[1],0x02);
-            set573DataforMotorFan(mFanSta[2],0x04);
-            set573DataforMotorFan(mMotorSta[0],0x08);
-            set573DataforMotorFan(mMotorSta[1],0x10);
-            set573DataforMotorFan(mMotorSta[2],0x20);
-            set573DataforMotorFan(mMotorSta[3],0x40);    
+        if(totalCount > (6000 + QG_SIGN_KEY_DELAY_1000MS)) {
+            if(DEVS1 == VALID) {
+                set573DataforS1S6(0x01);
+            }
+            if(DEVS2 == VALID) {
+                set573DataforS1S6(0x02);
+            }
+            if(DEVS3 == VALID) {
+                set573DataforS1S6(0x04);
+            }
+            if(DEVS4 == VALID) {
+                set573DataforS1S6(0x08);
+            }
+            if(DEVS5 == VALID) {
+                set573DataforS1S6(0x10);
+            }
+            if(DEVS6 == VALID) {
+                set573DataforS1S6(0x20);
+            }            
+            if(FAN1 == VALID) {
+                set573DataforMotorFan(mFanSta[0],0x01);
+            }
+            if(FAN2 == VALID) {
+                set573DataforMotorFan(mFanSta[1],0x02);
+            }
+            if(FAN3 == VALID) {
+                set573DataforMotorFan(mFanSta[2],0x04);
+            }            
+            if(MOTOR1 == VALID) {
+                set573DataforMotorFan(mMotorSta[0],0x08);
+            }
+            if(MOTOR2 == VALID) {
+                set573DataforMotorFan(mMotorSta[1],0x10);
+            }
+            if(MOTOR3 == VALID) {
+                set573DataforMotorFan(mMotorSta[2],0x20);
+            }
+            if(MOTOR4 == VALID) {
+                set573DataforMotorFan(mMotorSta[3],0x40); 
+            }
         }
         
-        if(totalCount < 10 || totalCount > 12000){
-            setDforGreen(0, m573Status[0]);
-            setDforRed(1, m573Status[1]);
-            setDforGreen(2, m573Status[2]);
-            setDforRed(3, m573Status[3]);
-            setDforRed(4, m573Status[4]);
+        if(totalCount < 5 || totalCount > (6000 + QG_SIGN_KEY_DELAY_1000MS)){
+            
+            for(i = 0 ;i < 5; i++) {
+                setDforLed(i, m573Status[i]);
+            }
         }
         mTimerStatus = 0;
+        reset_SYSTEM_OK();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

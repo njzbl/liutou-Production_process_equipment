@@ -167,7 +167,7 @@ GPIO_PinState getS6Status(void)
 
 GPIO_PinState getKeyinStatus(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOC, S6_IN_Pin);
+    return  HAL_GPIO_ReadPin(KEY_IN_GPIO_Port, KEY_IN_Pin);
 }
 
 uint8_t getS1S6KeyStatus(void)
@@ -236,7 +236,7 @@ void disenableCS0toCS4(void)
     HAL_GPIO_WritePin(GPIOB, CS4_Pin|LE_Pin, GPIO_PIN_RESET);
 }
 
-void setDforRed(uint16_t CSPin, uint8_t pinSta)
+void setDforLed(uint16_t CSPin, uint8_t pinSta)
 {
     uint16_t GPIOB_Pin2Set = 0;
     uint16_t GPIOB_Pin2Reset = 0;
@@ -305,66 +305,6 @@ void setDforRed(uint16_t CSPin, uint8_t pinSta)
     }
 }
 
-void setDforGreen(uint16_t CSPin, uint8_t pinSta)   //CS1
-{
-    uint16_t GPIOB_Pin2Set = 0;
-    uint16_t GPIOB_Pin2Reset = 0;
-    uint16_t GPIOA_Pin2Set = 0;
-    uint16_t GPIOA_Pin2Reset = 0;
-
-    if(pinSta & 0x80)
-        GPIOB_Pin2Set |= D7_Pin;
-    else
-        GPIOB_Pin2Reset |= D7_Pin;
-    if(pinSta & 0x40)
-        GPIOB_Pin2Set |= D6_Pin;
-    else
-        GPIOB_Pin2Reset |= D6_Pin;
-    if(pinSta & 0x20)
-        GPIOB_Pin2Set |= D5_Pin;
-    else
-        GPIOB_Pin2Reset |= D5_Pin;
-    if(pinSta & 0x10)
-        GPIOB_Pin2Set |= D4_Pin;
-    else
-        GPIOB_Pin2Reset |= D4_Pin;
-    if(pinSta & 0x08)
-        GPIOB_Pin2Set |= D3_Pin;
-    else
-        GPIOB_Pin2Reset |= D3_Pin;
-    if(pinSta & 0x04)
-        GPIOB_Pin2Set |= D2_Pin;
-    else
-        GPIOB_Pin2Reset |= D2_Pin;
-    if(pinSta & 0x02)
-        GPIOB_Pin2Set |= D1_Pin;
-    else
-        GPIOB_Pin2Reset |= D1_Pin;
-    if(pinSta & 0x01)
-        GPIOA_Pin2Set |= D0_Pin;
-    else
-        GPIOA_Pin2Reset |= D0_Pin;
-    if(GPIOB_Pin2Set != 0)
-        HAL_GPIO_WritePin(GPIOB, GPIOB_Pin2Set, GPIO_PIN_SET);
-    if(GPIOB_Pin2Reset != 0)
-        HAL_GPIO_WritePin(GPIOB, GPIOB_Pin2Reset, GPIO_PIN_RESET);
-    if(GPIOA_Pin2Set != 0)
-        HAL_GPIO_WritePin(GPIOA, GPIOA_Pin2Set, GPIO_PIN_SET);
-    if(GPIOA_Pin2Reset != 0)
-        HAL_GPIO_WritePin(GPIOA, GPIOA_Pin2Reset, GPIO_PIN_RESET);    
-    if(CSPin == CS0_Pin || CSPin == CS1_Pin || CSPin == CS2_Pin || CSPin == CS3_Pin){
-        HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_SET);
-        // HAL_Delay(10); 
-        HAL_GPIO_WritePin(GPIOD, CSPin, GPIO_PIN_RESET);
-    }
-    else if(CSPin == CS4_Pin){
-        HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_SET);
-        // HAL_Delay(10); 
-        HAL_GPIO_WritePin(GPIOB, CSPin, GPIO_PIN_RESET);
-    }
-}
-
-
 void ToggleWDI(void)
 {
     HAL_GPIO_TogglePin(GPIOC, WDI_Pin);
@@ -377,6 +317,11 @@ void Toggle_SYSTEM_OK(void)
 void set_SYSTEM_OK(void)
 {
     HAL_GPIO_WritePin(GPIOC, SYSTEM_OK_Pin, GPIO_PIN_SET);
+
+}
+void reset_SYSTEM_OK(void)
+{
+    HAL_GPIO_WritePin(GPIOC, SYSTEM_OK_Pin, GPIO_PIN_RESET);
 
 }
 /* USER CODE END 2 */

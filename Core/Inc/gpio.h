@@ -53,11 +53,11 @@ void setStart1Out(uint8_t sta);
 void setStart2Out(uint8_t sta);
 void setStart3Out(uint8_t sta);
 void disenableCS0toCS4(void);
-void setDforRed(uint16_t CSPin, uint8_t pinSta);
-void setDforGreen(uint16_t CSPin, uint8_t pinSta);
+void setDforLed(uint16_t CSPin, uint8_t pinSta);
 void ToggleWDI(void);
 void Toggle_SYSTEM_OK(void);
 void set_SYSTEM_OK(void);
+void reset_SYSTEM_OK(void);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

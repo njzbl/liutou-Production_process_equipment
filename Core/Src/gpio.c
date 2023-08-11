@@ -137,32 +137,32 @@ void MX_GPIO_Init(void)
 /* USER CODE BEGIN 2 */
 GPIO_PinState getS1Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOB, S1_IN_Pin);
+    return  HAL_GPIO_ReadPin(S1_IN_GPIO_Port, S1_IN_Pin);
 }
 
 GPIO_PinState getS2Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOB, S2_IN_Pin);
+    return  HAL_GPIO_ReadPin(S2_IN_GPIO_Port, S2_IN_Pin);
 }
 
 GPIO_PinState getS3Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOB, S3_IN_Pin);
+    return  HAL_GPIO_ReadPin(S3_IN_GPIO_Port, S3_IN_Pin);
 }
 
 GPIO_PinState getS4Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOC, S4_IN_Pin);
+    return  HAL_GPIO_ReadPin(S4_IN_GPIO_Port, S4_IN_Pin);
 }
 
 GPIO_PinState getS5Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOC, S5_IN_Pin);
+    return  HAL_GPIO_ReadPin(S5_IN_GPIO_Port, S5_IN_Pin);
 }
 
 GPIO_PinState getS6Status(void)
 {
-    return  HAL_GPIO_ReadPin(GPIOC, S6_IN_Pin);
+    return  HAL_GPIO_ReadPin(S6_IN_GPIO_Port, S6_IN_Pin);
 }
 
 GPIO_PinState getKeyinStatus(void)
@@ -173,19 +173,19 @@ GPIO_PinState getKeyinStatus(void)
 uint8_t getS1S6KeyStatus(void)
 {
     uint8_t re = 0;
-    if(getS1Status() == GPIO_PIN_SET);
+    if(getS1Status() == GPIO_PIN_SET)
         re |= 0x01;
-    if(getS2Status() == GPIO_PIN_SET);
+    if(getS2Status() == GPIO_PIN_SET)
         re |= 0x02;
-    if(getS3Status() == GPIO_PIN_SET);
+    if(getS3Status() == GPIO_PIN_SET)
         re |= 0x04;
-    if(getS4Status() == GPIO_PIN_SET);
+    if(getS4Status() == GPIO_PIN_SET)
         re |= 0x08;
-    if(getS5Status() == GPIO_PIN_SET);
+    if(getS5Status() == GPIO_PIN_SET)
         re |= 0x10;
-    if(getS6Status() == GPIO_PIN_SET);
+    if(getS6Status() == GPIO_PIN_SET)
         re |= 0x20;
-    if(getKeyinStatus() == GPIO_PIN_SET);
+    if(getKeyinStatus() == GPIO_PIN_SET)
         re |= 0x30;
     return re;
 }

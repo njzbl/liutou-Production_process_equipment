@@ -447,6 +447,7 @@ int main(void)
   uint32_t totalCount = 0;
   uint8_t systemStaMachine = 0;
   uint16_t motorStep[4] = {0};
+  uint16_t motorStep_FB_Current[4] = {0};   //只有电流方向正确下的电机步数
   uint16_t fanStep[3] = {0};
   int motorCur_temp[4] = {0};
   uint8_t allMotorSta = 0, allFanSta = 0, tempSta = 0;
@@ -524,10 +525,11 @@ int main(void)
         if(mTimerStatus != 1) {   //1000us Timer
             continue;
         }
-        
         ToggleWDI();
         if(mCheckStatus != 3)
             totalCount++;
+        if((totalCount % 500) == 1)
+            Toggle_SYSTEM_OK();
         if(mDmaTransferStatus == 1) {
             mFanCurrent[0][fanCurrentCount] = mADCxConvertedData[0]*3300/4096;
             mFanCurrent[1][fanCurrentCount] = mADCxConvertedData[1]*3300/4096;
@@ -584,6 +586,19 @@ int main(void)
                 if(totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS)) {     // > 100ms
                     if(mMotorCurrent[i][10] > MOTOR_CURRENT_F_MIN || mMotorCurrent[i][10] < MOTOR_CURRENT_B_MIN) {
                         motorStep[i]++;
+                        // printf("totalCount = %d mMotorCurrent[%d][10]= %d\r\n",totalCount,i,mMotorCurrent[i][10]);
+                    }
+                }
+                if((totalCount > (100 + QG_SIGN_KEY_DELAY_1000MS)) && totalCount < (5000 + QG_SIGN_KEY_DELAY_1000MS)) {     // > 100ms
+                    if(mMotorCurrent[i][10] < MOTOR_CURRENT_B_MIN) {
+                        motorStep_FB_Current[i]++;
+                        // printf("totalCount = %d mMotorCurrent[%d][10]= %d\r\n",totalCount,i,mMotorCurrent[i][10]);
+                    }
+                }
+                else if(totalCount > QG_SIGN_KEY_TOGGLE_6500MS){
+                    if(mMotorCurrent[i][10] > MOTOR_CURRENT_F_MIN) {
+                        motorStep_FB_Current[i]++;
+                        // printf("totalCount = %d mMotorCurrent[%d][10]= %d\r\n",totalCount,i,mMotorCurrent[i][10]);
                     }
                 }
             }            
@@ -609,6 +624,7 @@ int main(void)
                         for(i = 0;i < 4; i++) {
                             mMotorSta[i] = 0;
                             motorStep[i] = 0;
+                            motorStep_FB_Current[i] = 0;
                         }
                         for(i = 0;i < 3; i++) {
                             mFanSta[i] = 0;
@@ -685,6 +701,23 @@ int main(void)
                 mMotorSta[3] = MACHINE_NG;
                 allMotorSta |= 1;
             }
+
+            //判断电流方向，判断电机线接反
+            if(motorStep_FB_Current[0] < 10 && MOTOR1 == VALID) {  //只报电机故障不报S1S2故障
+                mMotorSta[0] = MACHINE_NG;
+            }
+            if(motorStep_FB_Current[1] < 10  && MOTOR2 == VALID) {  //只报电机故障不报S1S2故障
+                mMotorSta[1] = MACHINE_NG;
+            }
+            if(motorStep_FB_Current[2] < 10  && MOTOR3 == VALID) {  //只报电机故障不报S1S2故障
+                mMotorSta[2] = MACHINE_NG;
+            }
+            if(motorStep_FB_Current[3] < 10  && MOTOR4 == VALID) {  //只报电机故障不报S1S2故障
+                mMotorSta[3] = MACHINE_NG;
+            }
+
+
+
             if(fanStep[0] < 10 && FAN1 == VALID) {
                 mFanSta[0] = MACHINE_NG;
                 allFanSta |= 1;
